@@ -1,0 +1,31 @@
+# Environment & Secret Files
+.env
+.env.*
+!.env.example
+**/.clerk/
+
+# Python / Backend
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+*.db
+*.sqlite
+*.sqlite3
+backend/models_artifacts/*.joblib
+
+# Node / Next.js / Frontend
+**/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/coverage/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# IDE / Agent / OS
+.aicb/
+.vscode/
+.DS_Store
+*.log
+*.pem
