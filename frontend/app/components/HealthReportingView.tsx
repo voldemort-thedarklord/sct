@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { CommunityZone, HealthReport, UserProfile } from "../types";
 
 interface HealthReportingViewProps {
@@ -9,6 +9,8 @@ interface HealthReportingViewProps {
   currentUser: UserProfile;
   token: string;
   onRefresh: () => void;
+  embedded?: boolean;
+  onAddLocationRequested?: () => void;
 }
 
 const SYMPTOM_OPTIONS = [
@@ -34,6 +36,8 @@ export default function HealthReportingView({
   currentUser,
   token,
   onRefresh,
+  embedded = false,
+  onAddLocationRequested,
 }: HealthReportingViewProps) {
   const [zoneId, setZoneId] = useState<number>(zones[0]?.id || 0);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -51,11 +55,9 @@ export default function HealthReportingView({
     text: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (zones.length > 0 && (!zoneId || !zones.some((z) => z.id === zoneId))) {
-      setZoneId(zones[0].id);
-    }
-  }, [zones, zoneId]);
+  const activeZoneId = zones.some((z) => z.id === zoneId)
+    ? zoneId
+    : zones[0]?.id || 0;
 
   const toggleSymptom = (sym: string) => {
     setSelectedSymptoms((prev) =>
@@ -65,7 +67,7 @@ export default function HealthReportingView({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!zoneId) {
+    if (!activeZoneId) {
       setFeedback({
         type: "alert",
         text: "Please add a community location in the Water Quality tab first.",
@@ -90,7 +92,7 @@ export default function HealthReportingView({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          zone_id: Number(zoneId),
+          zone_id: Number(activeZoneId),
           reporter_name: currentUser.name,
           reporter_role: currentUser.role,
           symptoms: selectedSymptoms,
@@ -102,9 +104,13 @@ export default function HealthReportingView({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Could not submit report");
+      const updatedLevel =
+        data.updated_zone_risk?.risk_level ?? data.updated_zone_risk?.level ?? "Updated";
+      const updatedScore =
+        data.updated_zone_risk?.risk_score ?? data.updated_zone_risk?.score ?? 0;
       setFeedback({
         type: data.alert_triggered ? "alert" : "normal",
-        text: `Health report saved! Updated location risk: ${data.updated_zone_risk.level} (${data.updated_zone_risk.score}%)${
+        text: `Health report saved! Updated location risk: ${updatedLevel} (${updatedScore}/100)${
           data.alert_triggered
             ? " — A community health alert was automatically triggered."
             : "."
@@ -114,10 +120,10 @@ export default function HealthReportingView({
       setAffectedCount("");
       setNotes("");
       onRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFeedback({
         type: "alert",
-        text: err.message || "Error submitting health report",
+        text: err instanceof Error ? err.message : "Error submitting health report",
       });
     } finally {
       setSubmitting(false);
@@ -129,29 +135,31 @@ export default function HealthReportingView({
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-            Community Health Reports
-          </h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            Report stomach illness, fever, or water-related symptoms in your area to help spot outbreaks early.
-          </p>
-        </div>
+      {!embedded && (
+        <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
+              Community Health Reports
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Report stomach illness, fever, or water-related symptoms in your area to help spot outbreaks early.
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-4 py-2 text-sm">
-            <span className="text-zinc-400">Reports: </span>
-            <span className="font-semibold text-zinc-100">
-              {reports.length}
-            </span>
-          </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-4 py-2 text-sm">
-            <span className="text-zinc-400">Total Cases: </span>
-            <span className="font-semibold text-zinc-100">{totalAffected}</span>
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-4 py-2 text-sm">
+              <span className="text-zinc-400">Reports: </span>
+              <span className="font-semibold text-zinc-100">
+                {reports.length}
+              </span>
+            </div>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-4 py-2 text-sm">
+              <span className="text-zinc-400">Total Cases: </span>
+              <span className="font-semibold text-zinc-100">{totalAffected}</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {feedback && (
         <div
@@ -187,12 +195,22 @@ export default function HealthReportingView({
               </label>
               {zones.length === 0 ? (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                  No locations registered yet. Please add a location in the{" "}
-                  <strong>Water Quality</strong> tab first.
+                  No locations registered yet.{" "}
+                  {onAddLocationRequested ? (
+                    <button
+                      type="button"
+                      onClick={onAddLocationRequested}
+                      className="font-semibold underline hover:text-white"
+                    >
+                      Add a location in Log Water Test →
+                    </button>
+                  ) : (
+                    <span>Please ask a health worker or admin to register a monitoring location first.</span>
+                  )}
                 </div>
               ) : (
                 <select
-                  value={zoneId}
+                  value={activeZoneId}
                   onChange={(e) => setZoneId(Number(e.target.value))}
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-zinc-400 focus:outline-none"
                 >

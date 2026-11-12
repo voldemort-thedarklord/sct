@@ -7,15 +7,12 @@ export type UserRole =
   | "community_user"
   | "citizen";
 
-export type ActivePage =
-  | "dashboard"
-  | "water"
-  | "health"
-  | "predict"
-  | "map"
-  | "alerts"
-  | "analytics"
-  | "auth";
+export type ActivePage = "home" | "report" | "alerts" | "insights";
+
+/** Returns true for public citizen/community-member roles with simplified UI access. */
+export function isCitizenRole(role?: string | null): boolean {
+  return role === "citizen" || role === "community_user";
+}
 
 export interface UserProfile {
   id: number;

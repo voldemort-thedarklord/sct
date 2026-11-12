@@ -1,7 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { AlertItem, UserProfile, RISK_BADGE_STYLES } from "../types";
+import React, { useState } from "react";
+import {
+  AlertItem,
+  UserProfile,
+  RISK_BADGE_STYLES,
+  isCitizenRole,
+} from "../types";
 
 interface AlertManagementViewProps {
   alerts: AlertItem[];
@@ -10,33 +15,35 @@ interface AlertManagementViewProps {
   onRefresh: () => void;
 }
 
+type AlertBucket = "Active" | "Resolved" | "All";
+
+const ALERT_STEPS = ["Verified", "Dispatched", "Resolved"] as const;
+
 export default function AlertManagementView({
   alerts,
   currentUser,
   token,
   onRefresh,
 }: AlertManagementViewProps) {
-  const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(
-    alerts[0] || null
+  const isCitizen = isCitizenRole(currentUser.role);
+  const [statusFilter, setStatusFilter] = useState<AlertBucket>("Active");
+  const [selectedAlertId, setSelectedAlertId] = useState<number | null>(
+    alerts[0]?.id ?? null
   );
   const [actionNotes, setActionNotes] = useState<string>("");
   const [updating, setUpdating] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!selectedAlert && alerts.length > 0) {
-      setSelectedAlert(alerts[0]);
-    } else if (selectedAlert) {
-      const updated = alerts.find((a) => a.id === selectedAlert.id);
-      if (updated) setSelectedAlert(updated);
-    }
-  }, [alerts, selectedAlert]);
+  const filteredAlerts = alerts.filter((a) => {
+    if (statusFilter === "All") return true;
+    if (statusFilter === "Resolved") return a.status === "Resolved";
+    return a.status !== "Resolved";
+  });
 
-  const filteredAlerts =
-    statusFilter === "All"
-      ? alerts
-      : alerts.filter((a) => a.status === statusFilter);
+  const selectedAlert =
+    filteredAlerts.find((a) => a.id === selectedAlertId) ||
+    filteredAlerts[0] ||
+    null;
 
   const handleUpdateAlert = async (
     alertId: number,
@@ -62,19 +69,19 @@ export default function AlertManagementView({
       setFeedback(`Alert marked as ${newStatus}.`);
       setActionNotes("");
       onRefresh();
-    } catch (err: any) {
-      setFeedback(err.message || "Error updating alert");
+    } catch (err: unknown) {
+      setFeedback(
+        err instanceof Error ? err.message : "Error updating alert"
+      );
     } finally {
       setUpdating(false);
     }
   };
 
-  const counts = {
-    All: alerts.length,
-    Pending: alerts.filter((a) => a.status === "Pending").length,
-    Verified: alerts.filter((a) => a.status === "Verified").length,
-    Dispatched: alerts.filter((a) => a.status === "Dispatched").length,
+  const counts: Record<AlertBucket, number> = {
+    Active: alerts.filter((a) => a.status !== "Resolved").length,
     Resolved: alerts.filter((a) => a.status === "Resolved").length,
+    All: alerts.length,
   };
 
   return (
@@ -83,30 +90,30 @@ export default function AlertManagementView({
       <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-            Community Health Alerts
+            {isCitizen ? "Local Health Advisories" : "Community Health Alerts"}
           </h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Review, verify, and resolve early warnings triggered by unsafe water readings or illness clusters.
+            {isCitizen
+              ? "Active water safety advisories and outbreak warnings near your community."
+              : "Verify early warnings, dispatch field teams, and mark locations safe."}
           </p>
         </div>
 
-        {/* Status Filter Tabs */}
+        {/* Simplified 3-Tab Filter */}
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/70 p-1">
-          {(
-            ["All", "Pending", "Verified", "Dispatched", "Resolved"] as const
-          ).map((st) => {
-            const active = statusFilter === st;
+          {(["Active", "Resolved", "All"] as const).map((bucket) => {
+            const active = statusFilter === bucket;
             return (
               <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
+                key={bucket}
+                onClick={() => setStatusFilter(bucket)}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                   active
                     ? "bg-zinc-100 text-zinc-950"
                     : "text-zinc-400 hover:text-zinc-100"
                 }`}
               >
-                {st} ({counts[st]})
+                {bucket} ({counts[bucket]})
               </button>
             );
           })}
@@ -138,7 +145,7 @@ export default function AlertManagementView({
               return (
                 <button
                   key={al.id}
-                  onClick={() => setSelectedAlert(al)}
+                  onClick={() => setSelectedAlertId(al.id)}
                   className={`block w-full rounded-xl border p-5 text-left transition ${
                     isSelected
                       ? "border-zinc-400 bg-zinc-900"
@@ -185,7 +192,7 @@ export default function AlertManagementView({
           {/* Right 5 Cols: Selected Alert Action Panel */}
           <div className="lg:col-span-5">
             {selectedAlert && (
-              <div className="sticky top-6 space-y-5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+              <div className="space-y-5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 lg:sticky lg:top-6">
                 <div className="border-b border-zinc-800 pb-4">
                   <div className="text-xs font-medium text-zinc-400">
                     Selected Alert · {selectedAlert.zone_name}
@@ -196,6 +203,28 @@ export default function AlertManagementView({
                   <p className="mt-2 text-sm leading-relaxed text-zinc-300">
                     {selectedAlert.message}
                   </p>
+                </div>
+
+                {/* 3-Step Progress Tracker */}
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  {ALERT_STEPS.map((step, idx) => {
+                    const currentIdx = ALERT_STEPS.indexOf(
+                      selectedAlert.status as (typeof ALERT_STEPS)[number]
+                    );
+                    const done = currentIdx >= idx;
+                    return (
+                      <div
+                        key={step}
+                        className={`rounded-md border px-2 py-1.5 font-medium ${
+                          done
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                            : "border-zinc-800 bg-zinc-950 text-zinc-500"
+                        }`}
+                      >
+                        {idx + 1}. {step}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {selectedAlert.action_taken && (
@@ -209,68 +238,79 @@ export default function AlertManagementView({
                   </div>
                 )}
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zinc-200">
-                    Response Notes (Optional)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={actionNotes}
-                    onChange={(e) => setActionNotes(e.target.value)}
-                    placeholder="e.g., Dispatched water testing team and issued boil-water advisory."
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
-                  />
-                </div>
+                {isCitizen ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-relaxed text-amber-200">
+                    <div className="font-semibold">Community Safety Guidance</div>
+                    <p className="mt-1">
+                      Boil drinking water before consumption or use chlorinated/RO-treated water until local health officers mark this advisory Resolved.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-zinc-200">
+                        Response Notes (Optional)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={actionNotes}
+                        onChange={(e) => setActionNotes(e.target.value)}
+                        placeholder="e.g., Dispatched water testing team and issued boil-water advisory."
+                        className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
+                      />
+                    </div>
 
-                <div className="space-y-2.5">
-                  <div className="text-xs font-medium text-zinc-400">
-                    Update Alert Status:
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() =>
-                        handleUpdateAlert(
-                          selectedAlert.id,
-                          "Verified",
-                          "Alert verified by health officer."
-                        )
-                      }
-                      className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-xs font-semibold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
-                    >
-                      Mark Verified
-                    </button>
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() =>
-                        handleUpdateAlert(
-                          selectedAlert.id,
-                          "Dispatched",
-                          "Field team dispatched for chlorination and water sampling."
-                        )
-                      }
-                      className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
-                    >
-                      Dispatch Team
-                    </button>
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() =>
-                        handleUpdateAlert(
-                          selectedAlert.id,
-                          "Resolved",
-                          "Water quality restored to safe limits and alert resolved."
-                        )
-                      }
-                      className="rounded-lg bg-zinc-100 px-3 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-white disabled:opacity-50"
-                    >
-                      Mark Resolved
-                    </button>
-                  </div>
-                </div>
+                    <div className="space-y-2.5">
+                      <div className="text-xs font-medium text-zinc-400">
+                        Update Response Step:
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <button
+                          type="button"
+                          disabled={updating}
+                          onClick={() =>
+                            handleUpdateAlert(
+                              selectedAlert.id,
+                              "Verified",
+                              "Alert verified by health officer."
+                            )
+                          }
+                          className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-xs font-semibold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
+                        >
+                          1. Verify
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updating}
+                          onClick={() =>
+                            handleUpdateAlert(
+                              selectedAlert.id,
+                              "Dispatched",
+                              "Field team dispatched for chlorination and water sampling."
+                            )
+                          }
+                          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
+                        >
+                          2. Send Team
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updating}
+                          onClick={() =>
+                            handleUpdateAlert(
+                              selectedAlert.id,
+                              "Resolved",
+                              "Water quality restored to safe limits and alert resolved."
+                            )
+                          }
+                          className="rounded-lg bg-zinc-100 px-3 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-white disabled:opacity-50"
+                        >
+                          3. Mark Safe
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

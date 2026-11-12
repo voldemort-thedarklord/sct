@@ -5,10 +5,12 @@ import { AnalyticsData, RISK_BADGE_STYLES } from "../types";
 
 interface ReportsAnalyticsViewProps {
   token: string;
+  embedded?: boolean;
 }
 
 export default function ReportsAnalyticsView({
   token,
+  embedded = false,
 }: ReportsAnalyticsViewProps) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -73,19 +75,6 @@ export default function ReportsAnalyticsView({
     URL.revokeObjectURL(url);
   };
 
-  const exportJsonReport = () => {
-    if (!data) return;
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "community_health_data.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   if (errorMsg) {
     return (
       <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-200">
@@ -104,16 +93,26 @@ export default function ReportsAnalyticsView({
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-            Trends & Historical Data
-          </h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            Compare all monitored locations side-by-side and export your data for reporting.
-          </p>
-        </div>
+      {/* Page Header / Export Action */}
+      <div
+        className={`flex flex-col justify-between gap-4 sm:flex-row sm:items-center ${
+          embedded ? "" : "border-b border-zinc-800 pb-5"
+        }`}
+      >
+        {!embedded ? (
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
+              Trends & Historical Data
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Compare all monitored locations side-by-side and export your data for reporting.
+            </p>
+          </div>
+        ) : (
+          <div className="text-sm text-zinc-400">
+            Compare location water safety and export clean CSV summaries.
+          </div>
+        )}
 
         <div className="flex items-center gap-2.5">
           <button
@@ -121,12 +120,6 @@ export default function ReportsAnalyticsView({
             className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-white"
           >
             Download CSV Report
-          </button>
-          <button
-            onClick={exportJsonReport}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:text-white"
-          >
-            Download JSON
           </button>
         </div>
       </div>
@@ -254,44 +247,49 @@ export default function ReportsAnalyticsView({
         )}
       </div>
 
-      {/* AI Model Accuracy & Dataset Summary (Simple & Friendly) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <div className="text-xs font-medium text-zinc-400">
-            Disease Risk Classifier
+      {/* Technical AI Accuracy Details (Collapsed by Default) */}
+      <details className="rounded-xl border border-zinc-800 bg-zinc-900/50">
+        <summary className="cursor-pointer select-none px-5 py-4 text-sm font-medium text-zinc-300 hover:text-white">
+          How AI Calculates Risk (Model Validation Details)
+        </summary>
+        <div className="grid grid-cols-1 gap-4 border-t border-zinc-800 p-5 sm:grid-cols-3">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-4">
+            <div className="text-xs font-medium text-zinc-400">
+              Disease Risk Classifier
+            </div>
+            <div className="mt-1 text-xl font-semibold text-zinc-100">
+              {data.ml_metrics.random_forest.accuracy}% Accuracy
+            </div>
+            <p className="mt-1 text-xs text-zinc-400">
+              Trained on {data.ml_metrics.dataset?.total_records ?? 3781} real water quality records (Indian CPCB & Potability benchmark).
+            </p>
           </div>
-          <div className="mt-1 text-2xl font-semibold text-zinc-100">
-            {data.ml_metrics.random_forest.accuracy}% Accuracy
-          </div>
-          <p className="mt-1 text-xs text-zinc-400">
-            Trained on {data.ml_metrics.dataset?.total_records ?? 3781} real water quality records (Indian CPCB & Potability benchmark).
-          </p>
-        </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <div className="text-xs font-medium text-zinc-400">
-            Unusual Sensor Reading Detector
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-4">
+            <div className="text-xs font-medium text-zinc-400">
+              Unusual Sensor Reading Detector
+            </div>
+            <div className="mt-1 text-xl font-semibold text-zinc-100">
+              {data.ml_metrics.isolation_forest.detection_sensitivity}% Sensitivity
+            </div>
+            <p className="mt-1 text-xs text-zinc-400">
+              Automatically flags sudden spikes in water cloudiness, TDS, or pH.
+            </p>
           </div>
-          <div className="mt-1 text-2xl font-semibold text-zinc-100">
-            {data.ml_metrics.isolation_forest.detection_sensitivity}% Sensitivity
-          </div>
-          <p className="mt-1 text-xs text-zinc-400">
-            Automatically flags sudden spikes in water cloudiness, TDS, or pH.
-          </p>
-        </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <div className="text-xs font-medium text-zinc-400">
-            7-Day Outbreak Trend Forecaster
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-4">
+            <div className="text-xs font-medium text-zinc-400">
+              7-Day Outbreak Trend Forecaster
+            </div>
+            <div className="mt-1 text-xl font-semibold text-zinc-100">
+              {data.ml_metrics.xgboost.r2_score}% R² Score
+            </div>
+            <p className="mt-1 text-xs text-zinc-400">
+              Predicts how risk will change over the next 7 days with and without water treatment.
+            </p>
           </div>
-          <div className="mt-1 text-2xl font-semibold text-zinc-100">
-            {data.ml_metrics.xgboost.r2_score}% R² Score
-          </div>
-          <p className="mt-1 text-xs text-zinc-400">
-            Predicts how risk will change over the next 7 days with and without water treatment.
-          </p>
         </div>
-      </div>
+      </details>
     </div>
   );
 }

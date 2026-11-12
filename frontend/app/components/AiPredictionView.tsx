@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   CommunityZone,
   PredictionResponse,
@@ -12,6 +12,7 @@ interface AiPredictionViewProps {
   initialZone?: CommunityZone | null;
   token: string;
   onRefreshDashboard: () => void;
+  embedded?: boolean;
 }
 
 export default function AiPredictionView({
@@ -19,6 +20,7 @@ export default function AiPredictionView({
   initialZone,
   token,
   onRefreshDashboard,
+  embedded = false,
 }: AiPredictionViewProps) {
   const defaultZone = initialZone || zones[0];
 
@@ -46,83 +48,91 @@ export default function AiPredictionView({
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
-  const runPrediction = async (customParams?: {
-    zoneId?: string;
-    ph?: number;
-    turbidity?: number;
-    temperature?: number;
-    tds?: number;
-    dissolvedOxygen?: number;
-    symptomCases?: number;
-    rainfallMm?: number;
-    save?: boolean;
-  }) => {
-    setLoading(true);
-    try {
-      const zId = customParams?.zoneId ?? selectedZoneId;
-      const zObj = zones.find((z) => String(z.id) === String(zId));
+  const runPrediction = useCallback(
+    async (customParams?: {
+      zoneId?: string;
+      ph?: number;
+      turbidity?: number;
+      temperature?: number;
+      tds?: number;
+      dissolvedOxygen?: number;
+      symptomCases?: number;
+      rainfallMm?: number;
+      save?: boolean;
+    }) => {
+      setLoading(true);
+      try {
+        const zId = customParams?.zoneId ?? selectedZoneId;
+        const zObj = zones.find((z) => String(z.id) === String(zId));
 
-      const res = await fetch("/api/predict", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          zone_id: zObj ? zObj.id : null,
-          zone_name: zObj ? zObj.name : "Custom Water Scenario",
-          ph: customParams?.ph ?? ph,
-          turbidity: customParams?.turbidity ?? turbidity,
-          temperature: customParams?.temperature ?? temperature,
-          tds: customParams?.tds ?? tds,
-          dissolved_oxygen: customParams?.dissolvedOxygen ?? dissolvedOxygen,
-          symptom_cases_7d: customParams?.symptomCases ?? symptomCases,
-          rainfall_mm: customParams?.rainfallMm ?? rainfallMm,
-          save_record: customParams?.save ?? false,
-        }),
-      });
-      if (res.ok) {
-        const data: PredictionResponse = await res.json();
-        setPrediction(data);
-        if (customParams?.save) {
-          onRefreshDashboard();
+        const res = await fetch("/api/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            zone_id: zObj ? zObj.id : null,
+            zone_name: zObj ? zObj.name : "Custom Water Scenario",
+            ph: customParams?.ph ?? ph,
+            turbidity: customParams?.turbidity ?? turbidity,
+            temperature: customParams?.temperature ?? temperature,
+            tds: customParams?.tds ?? tds,
+            dissolved_oxygen: customParams?.dissolvedOxygen ?? dissolvedOxygen,
+            symptom_cases_7d: customParams?.symptomCases ?? symptomCases,
+            rainfall_mm: customParams?.rainfallMm ?? rainfallMm,
+            save_record: customParams?.save ?? false,
+          }),
+        });
+        if (res.ok) {
+          const data: PredictionResponse = await res.json();
+          setPrediction(data);
+          if (customParams?.save) {
+            onRefreshDashboard();
+          }
         }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [
+      selectedZoneId,
+      zones,
+      token,
+      ph,
+      turbidity,
+      temperature,
+      tds,
+      dissolvedOxygen,
+      symptomCases,
+      rainfallMm,
+      onRefreshDashboard,
+    ]
+  );
 
   useEffect(() => {
-    if (initialZone) {
-      setSelectedZoneId(String(initialZone.id));
-      const newPh = initialZone.latest_water?.ph ?? 7.2;
-      const newTurb = initialZone.latest_water?.turbidity ?? 2.0;
-      const newTemp = initialZone.latest_water?.temperature ?? 26.0;
-      const newTds = initialZone.latest_water?.tds ?? 260;
-      const newDo = initialZone.latest_water?.dissolved_oxygen ?? 7.0;
-      const newCases = initialZone.symptom_cases_active ?? 0;
-
-      setPh(newPh);
-      setTurbidity(newTurb);
-      setTemperature(newTemp);
-      setTds(newTds);
-      setDissolvedOxygen(newDo);
-      setSymptomCases(newCases);
-
-      if (initialZone.latest_water) {
-        runPrediction({
-          zoneId: String(initialZone.id),
-          ph: newPh,
-          turbidity: newTurb,
-          temperature: newTemp,
-          tds: newTds,
-          dissolvedOxygen: newDo,
-          symptomCases: newCases,
-        });
-      }
-    }
-  }, [initialZone]);
+    if (!initialZone?.latest_water) return;
+    let active = true;
+    const lw = initialZone.latest_water;
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      void runPrediction({
+        zoneId: String(initialZone.id),
+        ph: lw.ph,
+        turbidity: lw.turbidity,
+        temperature: lw.temperature,
+        tds: lw.tds,
+        dissolvedOxygen: lw.dissolved_oxygen,
+        symptomCases: initialZone.symptom_cases_active,
+      });
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+    // Run initial auto-preview once when mounted for a selected zone
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialZone?.id]);
 
   const applyZonePreset = (zId: string) => {
     setSelectedZoneId(zId);
@@ -152,16 +162,18 @@ export default function AiPredictionView({
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-            Disease Risk Predictor & 7-Day Forecast
-          </h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            Adjust the sliders to test water quality scenarios and see the predicted disease risk and 7-day trend.
-          </p>
+      {!embedded && (
+        <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
+              Disease Risk Predictor & 7-Day Forecast
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Adjust the sliders to test water quality scenarios and see the predicted disease risk and 7-day trend.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left 5 Columns: Easy Sliders & Presets */}
@@ -298,6 +310,16 @@ export default function AiPredictionView({
                 step: 1,
                 unit: " cases",
                 safe: "0 is ideal",
+              },
+              {
+                label: "Water Temperature",
+                val: temperature,
+                set: setTemperature,
+                min: 12,
+                max: 40,
+                step: 0.5,
+                unit: " °C",
+                safe: "Normal: 15 – 28 °C",
               },
               {
                 label: "Recent Rainfall",
@@ -453,7 +475,7 @@ export default function AiPredictionView({
                   Compares expected risk if no action is taken vs. if water treatment (chlorination) is applied.
                 </p>
 
-                <div className="mt-5 grid grid-cols-7 gap-2.5">
+                <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
                   {prediction.forecast_7d.map((pt) => {
                     const barColor =
                       pt.predicted_score >= 75

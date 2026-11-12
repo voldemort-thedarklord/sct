@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { CommunityZone, RISK_BADGE_STYLES, RiskLevel } from "../types";
+import type * as LeafletType from "leaflet";
+import { CommunityZone, RISK_BADGE_STYLES } from "../types";
 
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || "";
 
@@ -43,24 +44,18 @@ export default function RiskMap({
   compact = false,
 }: RiskMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const tileLayerRef = useRef<any>(null);
-  const layerGroupRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletType.Map | null>(null);
+  const tileLayerRef = useRef<LeafletType.TileLayer | null>(null);
+  const layerGroupRef = useRef<LeafletType.LayerGroup | null>(null);
 
   const [mapStyle, setMapStyle] = useState<MapStyleId>("voyager");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState<string>("All");
-  const [selectedZone, setSelectedZone] = useState<CommunityZone | null>(
-    zones[0] || null
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(
+    zones[0]?.id ?? null
   );
 
-  useEffect(() => {
-    if (!selectedZone && zones.length > 0) {
-      setSelectedZone(zones[0]);
-    } else if (selectedZone) {
-      const updated = zones.find((z) => z.id === selectedZone.id);
-      if (updated) setSelectedZone(updated);
-    }
-  }, [zones, selectedZone]);
+  const selectedZone =
+    zones.find((z) => z.id === selectedZoneId) || zones[0] || null;
 
   const filteredZones =
     selectedRiskFilter === "All"
@@ -78,7 +73,9 @@ export default function RiskMap({
 
       // Initialize map instance once
       if (!mapInstanceRef.current) {
-        const containerEl = mapContainerRef.current as any;
+        const containerEl = mapContainerRef.current as HTMLDivElement & {
+          _leaflet_id?: number | null;
+        };
         if (containerEl._leaflet_id) {
           containerEl._leaflet_id = null;
         }
@@ -125,9 +122,9 @@ export default function RiskMap({
       if (mapInstanceRef.current) {
         const styleConfig = MAP_TILE_STYLES[mapStyle];
         if (!tileLayerRef.current) {
-          mapInstanceRef.current.eachLayer((layer: any) => {
+          mapInstanceRef.current.eachLayer((layer: LeafletType.Layer) => {
             if (layer instanceof L.TileLayer) {
-              mapInstanceRef.current.removeLayer(layer);
+              mapInstanceRef.current?.removeLayer(layer);
             }
           });
           tileLayerRef.current = L.tileLayer(styleConfig.url, {
@@ -145,7 +142,6 @@ export default function RiskMap({
       LGroup.clearLayers();
 
       filteredZones.forEach((zone) => {
-        const style = RISK_BADGE_STYLES[zone.current_risk_level];
         const markerColor =
           zone.current_risk_level === "Critical"
             ? "#EF4444"
@@ -202,7 +198,7 @@ export default function RiskMap({
         circle.bindPopup(popupHtml);
         coreMarker.bindPopup(popupHtml);
 
-        const handleSelect = () => setSelectedZone(zone);
+        const handleSelect = () => setSelectedZoneId(zone.id);
         circle.on("click", handleSelect);
         coreMarker.on("click", handleSelect);
 
@@ -230,7 +226,7 @@ export default function RiskMap({
   }, []);
 
   const focusZoneOnMap = (zone: CommunityZone) => {
-    setSelectedZone(zone);
+    setSelectedZoneId(zone.id);
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([zone.latitude, zone.longitude], 12, {
         duration: 0.5,
@@ -290,7 +286,7 @@ export default function RiskMap({
             Community Risk Map
           </h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Powered by CARTO Basemaps (`cb1_578n_1_...`). Click any location on the map or list to inspect water safety.
+            Click any location pin or item in the list to inspect water safety and reported illness cases.
           </p>
         </div>
 
@@ -432,14 +428,14 @@ export default function RiskMap({
                   onClick={() => onSimulateZone(selectedZone)}
                   className="mt-5 w-full rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-white"
                 >
-                  Open in Risk Predictor →
+                  Open Risk Simulator →
                 </button>
               )}
             </div>
           ) : (
             <div className="p-6 text-sm text-zinc-400">
-              No locations added yet. Add a location in the{" "}
-              <strong className="text-zinc-200">Water Quality</strong> tab to view it on the map.
+              No locations added yet. Add a location in{" "}
+              <strong className="text-zinc-200">Field Reporting</strong> to view it on the map.
             </div>
           )}
 

@@ -2,29 +2,34 @@
 
 import React, { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
-import { UserProfile } from "../types";
+import { UserProfile, UserRole } from "../types";
 
 interface AuthViewProps {
   currentUser: UserProfile | null;
   token: string;
   onUserUpdated: (user: UserProfile) => void;
+  onClose?: () => void;
 }
 
-const ROLE_OPTIONS = [
+const ROLE_OPTIONS: Array<{
+  id: UserRole;
+  title: string;
+  description: string;
+}> = [
   {
     id: "authority",
     title: "Public Health Authority",
-    description: "Manage community locations, verify alerts, and review outbreak analytics.",
+    description: "Full access: manage locations, batch import CSVs, verify/resolve alerts, and run forecasts.",
   },
   {
     id: "health_worker",
     title: "Field Health Worker",
-    description: "Record water quality tests, log community symptom reports, and run risk checks.",
+    description: "Field testing: log water quality samples, report symptom clusters, and triage active alerts.",
   },
   {
     id: "citizen",
     title: "Community Member",
-    description: "View local water safety status, active health advisories, and report symptoms.",
+    description: "Simplified view: check the local safety map, view public health advisories, and report symptoms.",
   },
 ];
 
@@ -32,6 +37,7 @@ export default function AuthView({
   currentUser,
   token,
   onUserUpdated,
+  onClose,
 }: AuthViewProps) {
   const [selectedRole, setSelectedRole] = useState(
     currentUser?.role || "authority"
@@ -73,14 +79,25 @@ export default function AuthView({
   if (!currentUser) return null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="border-b border-zinc-800 pb-4">
-        <h2 className="text-xl font-semibold text-zinc-100">
-          Account & Role Settings
-        </h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          Manage your Clerk account profile and choose your community health role. Changes sync automatically with Supabase.
-        </p>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="flex items-start justify-between gap-4 border-b border-zinc-800 pb-4">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-100">
+            Account & Role Settings
+          </h2>
+          <p className="mt-1 text-sm text-zinc-400">
+            Switching your role adapts the workspace navigation and tools immediately.
+          </p>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-zinc-500 hover:text-white"
+          >
+            Done
+          </button>
+        )}
       </div>
 
       {/* Clerk Profile Summary Card */}
@@ -119,7 +136,7 @@ export default function AuthView({
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setSelectedRole(opt.id as any)}
+                  onClick={() => setSelectedRole(opt.id)}
                   className={`rounded-lg border p-4 text-left transition ${
                     active
                       ? "border-zinc-200 bg-zinc-800/90 text-zinc-100"
