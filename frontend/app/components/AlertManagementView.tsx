@@ -5,7 +5,6 @@ import {
   AlertItem,
   UserProfile,
   RISK_BADGE_STYLES,
-  isCitizenRole,
 } from "../types";
 
 interface AlertManagementViewProps {
@@ -25,7 +24,6 @@ export default function AlertManagementView({
   token,
   onRefresh,
 }: AlertManagementViewProps) {
-  const isCitizen = isCitizenRole(currentUser.role);
   const [statusFilter, setStatusFilter] = useState<AlertBucket>("Active");
   const [selectedAlertId, setSelectedAlertId] = useState<number | null>(
     alerts[0]?.id ?? null
@@ -90,12 +88,10 @@ export default function AlertManagementView({
       <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
-            {isCitizen ? "Local Health Advisories" : "Community Health Alerts"}
+            Community Health Alerts
           </h2>
           <p className="mt-1 text-sm text-zinc-400">
-            {isCitizen
-              ? "Active water safety advisories and outbreak warnings near your community."
-              : "Verify early warnings, dispatch field teams, and mark locations safe."}
+            Read active water safety advisories, verify warnings, or mark issues resolved.
           </p>
         </div>
 
@@ -238,79 +234,77 @@ export default function AlertManagementView({
                   </div>
                 )}
 
-                {isCitizen ? (
+                {selectedAlert.status !== "Resolved" && (
                   <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-relaxed text-amber-200">
-                    <div className="font-semibold">Community Safety Guidance</div>
+                    <div className="font-semibold">Safety Tip</div>
                     <p className="mt-1">
-                      Boil drinking water before consumption or use chlorinated/RO-treated water until local health officers mark this advisory Resolved.
+                      Boil drinking water before use or use RO/chlorinated water until this warning is marked Safe.
                     </p>
                   </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-zinc-200">
-                        Response Notes (Optional)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={actionNotes}
-                        onChange={(e) => setActionNotes(e.target.value)}
-                        placeholder="e.g., Dispatched water testing team and issued boil-water advisory."
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-2.5">
-                      <div className="text-xs font-medium text-zinc-400">
-                        Update Response Step:
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <button
-                          type="button"
-                          disabled={updating}
-                          onClick={() =>
-                            handleUpdateAlert(
-                              selectedAlert.id,
-                              "Verified",
-                              "Alert verified by health officer."
-                            )
-                          }
-                          className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-xs font-semibold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
-                        >
-                          1. Verify
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updating}
-                          onClick={() =>
-                            handleUpdateAlert(
-                              selectedAlert.id,
-                              "Dispatched",
-                              "Field team dispatched for chlorination and water sampling."
-                            )
-                          }
-                          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
-                        >
-                          2. Send Team
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updating}
-                          onClick={() =>
-                            handleUpdateAlert(
-                              selectedAlert.id,
-                              "Resolved",
-                              "Water quality restored to safe limits and alert resolved."
-                            )
-                          }
-                          className="rounded-lg bg-zinc-100 px-3 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-white disabled:opacity-50"
-                        >
-                          3. Mark Safe
-                        </button>
-                      </div>
-                    </div>
-                  </>
                 )}
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-zinc-200">
+                    Update Notes (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={actionNotes}
+                    onChange={(e) => setActionNotes(e.target.value)}
+                    placeholder="e.g., Sample re-tested or boil-water notice shared with neighborhood."
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="text-xs font-medium text-zinc-400">
+                    Update Status:
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() =>
+                        handleUpdateAlert(
+                          selectedAlert.id,
+                          "Verified",
+                          "Alert confirmed by community check."
+                        )
+                      }
+                      className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-xs font-semibold text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      1. Confirm
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() =>
+                        handleUpdateAlert(
+                          selectedAlert.id,
+                          "Dispatched",
+                          "Field check or water treatment started."
+                        )
+                      }
+                      className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
+                    >
+                      2. Action Taken
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() =>
+                        handleUpdateAlert(
+                          selectedAlert.id,
+                          "Resolved",
+                          "Water quality restored to safe limits and alert resolved."
+                        )
+                      }
+                      className="rounded-lg bg-zinc-100 px-3 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-white disabled:opacity-50"
+                    >
+                      3. Mark Safe
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

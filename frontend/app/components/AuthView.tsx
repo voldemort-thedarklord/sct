@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
-import { UserProfile, UserRole } from "../types";
+import { UserProfile } from "../types";
 
 interface AuthViewProps {
   currentUser: UserProfile | null;
@@ -11,37 +11,12 @@ interface AuthViewProps {
   onClose?: () => void;
 }
 
-const ROLE_OPTIONS: Array<{
-  id: UserRole;
-  title: string;
-  description: string;
-}> = [
-  {
-    id: "authority",
-    title: "Public Health Authority",
-    description: "Full access: manage locations, batch import CSVs, verify/resolve alerts, and run forecasts.",
-  },
-  {
-    id: "health_worker",
-    title: "Field Health Worker",
-    description: "Field testing: log water quality samples, report symptom clusters, and triage active alerts.",
-  },
-  {
-    id: "citizen",
-    title: "Community Member",
-    description: "Simplified view: check the local safety map, view public health advisories, and report symptoms.",
-  },
-];
-
 export default function AuthView({
   currentUser,
   token,
   onUserUpdated,
   onClose,
 }: AuthViewProps) {
-  const [selectedRole, setSelectedRole] = useState(
-    currentUser?.role || "authority"
-  );
   const [assignedZone, setAssignedZone] = useState(
     currentUser?.assigned_zone || "All Locations"
   );
@@ -61,7 +36,6 @@ export default function AuthView({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          role: selectedRole,
           assigned_zone: assignedZone,
           phone,
         }),
@@ -69,7 +43,7 @@ export default function AuthView({
       if (res.ok) {
         const updated = await res.json();
         onUserUpdated(updated);
-        setSavedMsg("Profile preferences saved and synced to Supabase.");
+        setSavedMsg("Preferences saved.");
       }
     } finally {
       setSaving(false);
@@ -83,10 +57,10 @@ export default function AuthView({
       <div className="flex items-start justify-between gap-4 border-b border-zinc-800 pb-4">
         <div>
           <h2 className="text-xl font-semibold text-zinc-100">
-            Account & Role Settings
+            Account & Alert Preferences
           </h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Switching your role adapts the workspace navigation and tools immediately.
+            Set your local area and phone number to receive water safety alerts.
           </p>
         </div>
         {onClose && (
@@ -100,7 +74,7 @@ export default function AuthView({
         )}
       </div>
 
-      {/* Clerk Profile Summary Card */}
+      {/* Account Summary Card */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-5">
         <div className="flex items-center gap-4">
           <UserButton />
@@ -113,52 +87,19 @@ export default function AuthView({
         </div>
         <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400">
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          Synced with Clerk & Supabase
+          Signed In
         </div>
       </div>
 
-      {/* Role & Preferences Form */}
+      {/* Contact Preferences Form */}
       <form
         onSubmit={handleSaveProfile}
         className="space-y-6 rounded-lg border border-zinc-800 bg-zinc-900/60 p-6"
       >
-        <div>
-          <label className="block text-sm font-medium text-zinc-200">
-            Select Your Role
-          </label>
-          <p className="mt-0.5 text-xs text-zinc-400">
-            Choose how you use the platform so forms and alerts match your workflow.
-          </p>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {ROLE_OPTIONS.map((opt) => {
-              const active = selectedRole === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setSelectedRole(opt.id)}
-                  className={`rounded-lg border p-4 text-left transition ${
-                    active
-                      ? "border-zinc-200 bg-zinc-800/90 text-zinc-100"
-                      : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
-                  }`}
-                >
-                  <div className="text-sm font-medium text-zinc-100">
-                    {opt.title}
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                    {opt.description}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-zinc-300">
-              Primary Community / Area
+              My Town / Area
             </label>
             <input
               type="text"
@@ -170,7 +111,7 @@ export default function AuthView({
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-zinc-300">
-              Contact Phone (Optional, for SMS Alerts)
+              Phone Number (Optional, for SMS Alerts)
             </label>
             <input
               type="text"

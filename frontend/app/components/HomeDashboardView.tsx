@@ -8,8 +8,6 @@ import {
   DashboardSummary,
   RISK_BADGE_STYLES,
   RiskLevel,
-  UserRole,
-  isCitizenRole,
 } from "../types";
 
 const RiskMap = dynamic(() => import("./RiskMap"), {
@@ -25,7 +23,6 @@ interface HomeDashboardViewProps {
   summary: DashboardSummary;
   zones: CommunityZone[];
   alerts: AlertItem[];
-  userRole: UserRole;
   onLogWater: () => void;
   onReportSymptoms: () => void;
   onOpenAlerts: () => void;
@@ -34,19 +31,17 @@ interface HomeDashboardViewProps {
 
 /**
  * Plain-language Home & Action Center consolidating Overview and Community Map.
- * Surfaces urgent areas and active alerts first to minimize scrolling and jargon.
+ * Open to any community user with easy-to-read cards and direct action buttons.
  */
 export default function HomeDashboardView({
   summary,
   zones,
   alerts,
-  userRole,
   onLogWater,
   onReportSymptoms,
   onOpenAlerts,
   onSimulateZone,
 }: HomeDashboardViewProps) {
-  const isCitizen = isCitizenRole(userRole);
   const urgentCount = summary.kpis.high_or_critical_zones;
 
   const [watchlistFilter, setWatchlistFilter] = useState<"urgent" | "all">(
@@ -100,13 +95,11 @@ export default function HomeDashboardView({
           </div>
           <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-zinc-100">
             {urgentCount > 0
-              ? "Active Water & Health Advisories"
-              : "Community Water Safety Overview"}
+              ? "Active Water & Health Warnings"
+              : "Community Water Safety"}
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            {isCitizen
-              ? "Check water safety near your town, review active advisories, or report symptoms in seconds."
-              : "Focus on flagged areas below, verify active alerts, or log a new field sample."}
+            Check safe and risky towns below, add a new location, log a water test, or report illness symptoms.
           </p>
         </div>
 
@@ -117,14 +110,12 @@ export default function HomeDashboardView({
           >
             + Report Illness
           </button>
-          {!isCitizen && (
-            <button
-              onClick={onLogWater}
-              className="rounded-lg bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-white"
-            >
-              + Log Water Test
-            </button>
-          )}
+          <button
+            onClick={onLogWater}
+            className="rounded-lg bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-white"
+          >
+            + Add Location / Water Test
+          </button>
         </div>
       </div>
 
@@ -170,9 +161,7 @@ export default function HomeDashboardView({
             </span>
           </div>
           <div className="mt-2.5 text-xs text-zinc-500">
-            {isCitizen
-              ? "Click to read community advisories →"
-              : "Click to verify & dispatch teams →"}
+            Click to review &amp; update alerts →
           </div>
         </button>
 
@@ -212,7 +201,7 @@ export default function HomeDashboardView({
           </div>
           <RiskMap
             zones={zones}
-            onSimulateZone={!isCitizen ? onSimulateZone : undefined}
+            onSimulateZone={onSimulateZone}
           />
         </div>
       ) : (
@@ -270,18 +259,14 @@ export default function HomeDashboardView({
                   No community locations added yet
                 </div>
                 <p className="mt-1 text-xs text-zinc-400">
-                  {isCitizen
-                    ? "Ask your community health worker to register a location."
-                    : "Add your first town or station to start monitoring water risk."}
+                  Add your town, village, or local water tank to start monitoring water safety.
                 </p>
-                {!isCitizen && (
-                  <button
-                    onClick={onLogWater}
-                    className="mt-4 rounded-md bg-zinc-100 px-4 py-2 text-xs font-medium text-zinc-950 transition hover:bg-white"
-                  >
-                    + Add First Location
-                  </button>
-                )}
+                <button
+                  onClick={onLogWater}
+                  className="mt-4 rounded-md bg-zinc-100 px-4 py-2 text-xs font-medium text-zinc-950 transition hover:bg-white"
+                >
+                  + Add First Location
+                </button>
               </div>
             ) : visibleZones.length === 0 ? (
               <div className="p-8 text-center text-sm text-zinc-400">
@@ -331,15 +316,13 @@ export default function HomeDashboardView({
                           </div>
                         </div>
 
-                        {!isCitizen && (
-                          <button
-                            type="button"
-                            onClick={() => onSimulateZone(z)}
-                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:text-white"
-                          >
-                            Simulate
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onSimulateZone(z)}
+                          className="rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:text-white"
+                        >
+                          Forecast
+                        </button>
                       </div>
                     </div>
                   );
@@ -370,7 +353,7 @@ export default function HomeDashboardView({
             <RiskMap
               zones={zones}
               compact={true}
-              onSimulateZone={!isCitizen ? onSimulateZone : undefined}
+              onSimulateZone={onSimulateZone}
             />
           </div>
         </div>

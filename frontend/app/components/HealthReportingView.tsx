@@ -94,7 +94,6 @@ export default function HealthReportingView({
         body: JSON.stringify({
           zone_id: Number(activeZoneId),
           reporter_name: currentUser.name,
-          reporter_role: currentUser.role,
           symptoms: selectedSymptoms,
           affected_count: Number(affectedCount) || 1,
           severity,

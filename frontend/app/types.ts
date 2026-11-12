@@ -1,24 +1,11 @@
 export type RiskLevel = "Low" | "Moderate" | "High" | "Critical";
 
-export type UserRole =
-  | "admin"
-  | "authority"
-  | "health_worker"
-  | "community_user"
-  | "citizen";
-
 export type ActivePage = "home" | "report" | "alerts" | "insights";
-
-/** Returns true for public citizen/community-member roles with simplified UI access. */
-export function isCitizenRole(role?: string | null): boolean {
-  return role === "citizen" || role === "community_user";
-}
 
 export interface UserProfile {
   id: number;
   name: string;
   email: string;
-  role: UserRole;
   assigned_zone: string;
   phone?: string;
   token?: string;

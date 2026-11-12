@@ -428,14 +428,14 @@ export default function RiskMap({
                   onClick={() => onSimulateZone(selectedZone)}
                   className="mt-5 w-full rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-white"
                 >
-                  Open Risk Simulator →
+                  Check 7-Day Forecast →
                 </button>
               )}
             </div>
           ) : (
             <div className="p-6 text-sm text-zinc-400">
               No locations added yet. Add a location in{" "}
-              <strong className="text-zinc-200">Field Reporting</strong> to view it on the map.
+              <strong className="text-zinc-200">Log &amp; Report</strong> to view it on the map.
             </div>
           )}
 

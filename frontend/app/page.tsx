@@ -18,7 +18,6 @@ import {
   AlertItem,
   DashboardSummary,
   UserProfile,
-  isCitizenRole,
 } from "./types";
 import HomeDashboardView from "./components/HomeDashboardView";
 import FieldReportingView, {
@@ -138,15 +137,10 @@ function SignedInApp() {
       clerkUser?.fullName ||
       clerkUser?.firstName ||
       clerkUser?.primaryEmailAddress?.emailAddress ||
-      "User",
+      "Community User",
     email: clerkUser?.primaryEmailAddress?.emailAddress || "",
-    role: "authority",
     assigned_zone: "All Locations",
   };
-
-  const citizenMode = isCitizenRole(fallbackUser.role);
-  const effectivePage: ActivePage =
-    citizenMode && activePage === "insights" ? "home" : activePage;
 
   const navItems: {
     id: ActivePage;
@@ -154,18 +148,13 @@ function SignedInApp() {
     badge?: number;
   }[] = [
     { id: "home", label: "Home" },
-    {
-      id: "report",
-      label: citizenMode ? "Report Illness" : "Field Reporting",
-    },
+    { id: "report", label: "Log & Report" },
     {
       id: "alerts",
-      label: citizenMode ? "Local Advisories" : "Health Alerts",
+      label: "Health Alerts",
       badge: summary?.kpis.active_alerts || 0,
     },
-    ...(!citizenMode
-      ? [{ id: "insights" as ActivePage, label: "Insights & Simulator" }]
-      : []),
+    { id: "insights", label: "Forecast & Trends" },
   ];
 
   return (
@@ -189,7 +178,7 @@ function SignedInApp() {
           {/* 4 Goal-Driven Tabs */}
           <nav className="space-y-1 p-3">
             {navItems.map((item) => {
-              const active = effectivePage === item.id;
+              const active = activePage === item.id;
               return (
                 <button
                   key={item.id}
@@ -218,7 +207,7 @@ function SignedInApp() {
           </nav>
         </div>
 
-        {/* User Profile Footer -> Opens Role Switcher Drawer */}
+        {/* User Profile Footer -> Opens Contact Preferences Drawer */}
         <div className="border-t border-zinc-800/80 p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -227,8 +216,8 @@ function SignedInApp() {
                 <div className="truncate text-sm font-medium text-zinc-100">
                   {fallbackUser.name}
                 </div>
-                <div className="truncate text-xs capitalize text-zinc-400">
-                  {fallbackUser.role.replace("_", " ")}
+                <div className="truncate text-xs text-zinc-400">
+                  {fallbackUser.assigned_zone || "All Locations"}
                 </div>
               </div>
             </div>
@@ -236,7 +225,7 @@ function SignedInApp() {
               onClick={() => setProfileOpen(true)}
               className="shrink-0 rounded border border-zinc-800 px-2.5 py-1 text-xs text-zinc-300 hover:border-zinc-600 hover:text-white"
             >
-              Role
+              Profile
             </button>
           </div>
         </div>
@@ -248,7 +237,7 @@ function SignedInApp() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 bg-[#0D0D10] px-6 py-3.5">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-zinc-200">
-              {navItems.find((n) => n.id === effectivePage)?.label || "Home"}
+              {navItems.find((n) => n.id === activePage)?.label || "Home"}
             </span>
           </div>
 
@@ -260,16 +249,22 @@ function SignedInApp() {
               Refresh
             </button>
             <button
-              onClick={() => openReportView(citizenMode ? "health" : "water")}
+              onClick={() => openReportView("health")}
+              className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white"
+            >
+              + Report Illness
+            </button>
+            <button
+              onClick={() => openReportView("water")}
               className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-medium text-zinc-950 transition hover:bg-white"
             >
-              {citizenMode ? "+ Report Illness" : "+ Field Report"}
+              + Log Water Test
             </button>
             <button
               onClick={() => setProfileOpen(true)}
               className="rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-300 lg:hidden"
             >
-              Role
+              Profile
             </button>
             <div className="flex items-center lg:hidden">
               <UserButton />
@@ -283,7 +278,7 @@ function SignedInApp() {
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
                 className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium ${
-                  effectivePage === item.id
+                  activePage === item.id
                     ? "bg-zinc-100 text-zinc-950"
                     : "bg-zinc-900 text-zinc-400"
                 }`}
@@ -302,12 +297,11 @@ function SignedInApp() {
             </div>
           ) : (
             <>
-              {effectivePage === "home" && summary && (
+              {activePage === "home" && summary && (
                 <HomeDashboardView
                   summary={summary}
                   zones={zones}
                   alerts={alerts}
-                  userRole={fallbackUser.role}
                   onLogWater={() => openReportView("water")}
                   onReportSymptoms={() => openReportView("health")}
                   onOpenAlerts={() => setActivePage("alerts")}
@@ -315,7 +309,7 @@ function SignedInApp() {
                 />
               )}
 
-              {effectivePage === "report" && (
+              {activePage === "report" && (
                 <FieldReportingView
                   zones={zones}
                   waterReadings={waterReadings}
@@ -329,7 +323,7 @@ function SignedInApp() {
                 />
               )}
 
-              {effectivePage === "alerts" && (
+              {activePage === "alerts" && (
                 <AlertManagementView
                   alerts={alerts}
                   currentUser={fallbackUser}
@@ -338,7 +332,7 @@ function SignedInApp() {
                 />
               )}
 
-              {effectivePage === "insights" && !citizenMode && (
+              {activePage === "insights" && (
                 <InsightsSimulatorView
                   zones={zones}
                   initialZone={simulatedZone}
@@ -353,12 +347,12 @@ function SignedInApp() {
         </main>
       </div>
 
-      {/* Account & Role Slide-Over Drawer */}
+      {/* Account & Contact Preferences Slide-Over Drawer */}
       {profileOpen && (
         <div className="fixed inset-0 z-[1000] flex justify-end bg-black/70 backdrop-blur-xs">
           <div className="h-full w-full max-w-xl overflow-y-auto border-l border-zinc-800 bg-[#0D0D10] p-6 shadow-2xl">
             <AuthView
-              key={fallbackUser.role}
+              key={fallbackUser.id}
               currentUser={fallbackUser}
               token={token}
               onUserUpdated={(updated) => setCurrentUser(updated)}
