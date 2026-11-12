@@ -6,8 +6,9 @@ import time
 from datetime import datetime, timezone
 from typing import Optional, List
 import pandas as pd
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Header
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,7 @@ from supabase_sync import sync_all_to_supabase, SUPABASE_PROJECT_ID, SUPABASE_UR
 # Create tables and synchronize with Supabase
 Base.metadata.create_all(bind=engine)
 with SessionLocal() as _init_db:
+    _supabase_synced = sync_all_to_supabase(_init_db)
     seed_initial_data(_init_db)
     _supabase_synced = sync_all_to_supabase(_init_db)
 
@@ -36,13 +38,46 @@ app = FastAPI(
     version="1.0.0",
 )
 
+_DEFAULT_ALLOWED_ORIGINS = [
+    "https://smartcommunityht.vercel.app",
+    "https://www.smartcommunityht.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+_EXTRA_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+ALLOWED_ORIGINS = list(dict.fromkeys(_DEFAULT_ALLOWED_ORIGINS + _EXTRA_ORIGINS))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://([a-zA-Z0-9-]+\.)*vercel\.app$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
+    max_age=86400,
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin and (
+        origin in ALLOWED_ORIGINS or origin.endswith(".vercel.app")
+    ):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Vary"] = "Origin"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"},
+        headers=headers,
+    )
 
 
 # --- Clerk Session Token Verification & Supabase User Sync ---

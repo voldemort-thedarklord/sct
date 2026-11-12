@@ -21,4 +21,4 @@ RUN rm -rf models_artifacts/*.joblib && python -c "import ml_engine; print('ML m
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 2"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1"]
